@@ -125,7 +125,11 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(true).MatchCTStateTrk(true).
 			MatchRegRange(int(marksReg), markTrafficFromLocal, binding.Range{0, 15}).
+<<<<<<< HEAD
 			Action().LoadRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+=======
+			Action().LoadRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
+>>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 			Action().GotoTable(nextTable).
 			Cookie(c.cookieAllocator.Request(category).Raw()).
 			Done(),
@@ -142,7 +146,11 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 		c.pipeline[conntrackCommitTable].BuildFlow(priorityNormal).
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(false).
+<<<<<<< HEAD
 			MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+=======
+			MatchRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
+>>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 			Action().CT(true, L2ForwardingOutTable, CtZone).
 			SNAT(snatIPRange, nil).
 			LoadToMark(snatCTMark).CTDone().
@@ -152,14 +160,22 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 	// The following flows are for both apply DNAT + SNAT for packets.
 	// If AntreaProxy is disabled, no DNAT happens in OVS pipeline.
 	if c.enableProxy {
+<<<<<<< HEAD
 		// If the SNAT is needed after DNAT, mark the snatDefaultMark even the connection is not new.
+=======
+		// If the SNAT is needed after DNAT, mark the snatRequiredMark even the connection is not new.
+>>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 		// Because this kind of packets need to enter ctZoneSNAT to make sure the SNAT can be applied
 		// before leaving the pipeline.
 		flows = append(flows, l3FwdTable.BuildFlow(priorityLow).
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(false).MatchCTStateTrk(true).MatchCTStateDNAT(true).
 			MatchRegRange(int(marksReg), markTrafficFromLocal, binding.Range{0, 15}).
+<<<<<<< HEAD
 			Action().LoadRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+=======
+			Action().LoadRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
+>>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 			Action().GotoTable(nextTable).
 			Cookie(c.cookieAllocator.Request(category).Raw()).
 			Done())
@@ -169,7 +185,11 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 		flows = append(flows, c.pipeline[conntrackCommitTable].BuildFlow(priorityNormal).
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(true).
+<<<<<<< HEAD
 			MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+=======
+			MatchRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
+>>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 			Action().CT(true, L2ForwardingOutTable, ctZoneSNAT).
 			SNAT(snatIPRange, nil).
 			LoadToMark(snatCTMark).CTDone().
@@ -178,7 +198,11 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 		flows = append(flows, c.pipeline[conntrackCommitTable].BuildFlow(priorityNormal).
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(false).MatchCTStateTrk(true).MatchCTStateDNAT(true).
+<<<<<<< HEAD
 			MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+=======
+			MatchRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
+>>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 			Action().CT(false, L2ForwardingOutTable, ctZoneSNAT).NAT().CTDone().
 			Cookie(c.cookieAllocator.Request(category).Raw()).
 			Done())
