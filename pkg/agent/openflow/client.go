@@ -150,10 +150,11 @@ type Client interface {
 	// This function is only used for Windows platform.
 	InstallBridgeUplinkFlows() error
 
-	// InstallExternalFlows sets up flows to enable Pods to communicate to the external IP addresses. The corresponding
-	// OpenFlow entries include: 1) identify the packets from local Pods to the external IP address, 2) mark the traffic
-	// in the connection tracking context, and 3) SNAT the packets with Node IP.
-	// This function is only used for Windows platform.
+	// InstallExternalFlows sets up flows to enable Pods to communicate to
+	// the external IP addresses. The flows identify the packets from local
+	// Pods to the external IP address, and mark the packets to be SNAT'd
+	// with the configured SNAT IPs. On Windows Node, the flows also perform
+	// SNAT with the Openflow NAT action.
 	InstallExternalFlows() error
 
 	// Disconnect disconnects the connection between client and OFSwitch.
@@ -477,19 +478,11 @@ func (c *client) UninstallServiceFlows(svcIP net.IP, svcPort uint16, protocol bi
 }
 
 func (c *client) InstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	c.replayMutex.RLock()
-	defer c.replayMutex.RUnlock()
-	var flows []binding.Flow
-	flows = append(flows, c.loadBalancerServiceFromOutsideFlow(svcIP, svcPort, protocol))
-	cacheKey := fmt.Sprintf("LoadBalancerService_%s_%d_%s", svcIP, svcPort, protocol)
-	return c.addFlows(c.serviceFlowCache, cacheKey, flows)
+	return c.installLoadBalancerServiceFromOutsideFlows(svcIP, svcPort, protocol)
 }
 
 func (c *client) UninstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	c.replayMutex.RLock()
-	defer c.replayMutex.RUnlock()
-	cacheKey := fmt.Sprintf("LoadBalancerService_%s_%d_%s", svcIP, svcPort, protocol)
-	return c.deleteFlows(c.serviceFlowCache, cacheKey)
+	return c.uninstallLoadBalancerServiceFromOutsideFlows(svcIP, svcPort, protocol)
 }
 
 func (c *client) GetServiceFlowKeys(svcIP net.IP, svcPort uint16, protocol binding.Protocol, endpoints []proxy.Endpoint) []string {
@@ -580,13 +573,7 @@ func (c *client) InstallDefaultTunnelFlows() error {
 }
 
 func (c *client) InstallBridgeUplinkFlows() error {
-	flows := c.hostBridgeUplinkFlows(*c.nodeConfig.PodIPv4CIDR, cookie.Default)
-	c.hostNetworkingFlows = flows
-	if err := c.ofEntryOperations.AddAll(flows); err != nil {
-		return err
-	}
-	c.hostNetworkingFlows = flows
-	return nil
+	return c.installBridgeUplinkFlows()
 }
 
 func (c *client) initialize() error {
@@ -655,9 +642,16 @@ func (c *client) Initialize(roundInfo types.RoundInfo, nodeConfig *config.NodeCo
 
 func (c *client) InstallExternalFlows() error {
 	nodeIP := c.nodeConfig.NodeIPAddr.IP
-	podSubnet := c.nodeConfig.PodIPv4CIDR
-	flows := c.uplinkSNATFlows(cookie.SNAT)
-	flows = append(flows, c.snatFlows(nodeIP, *podSubnet, cookie.SNAT)...)
+	localGatewayMAC := c.nodeConfig.GatewayConfig.MAC
+
+	var flows []binding.Flow
+	if c.nodeConfig.PodIPv4CIDR != nil {
+		flows = c.externalFlows(nodeIP, *c.nodeConfig.PodIPv4CIDR, localGatewayMAC)
+	}
+	if c.nodeConfig.PodIPv6CIDR != nil {
+		flows = append(flows, c.externalFlows(nodeIP, *c.nodeConfig.PodIPv6CIDR, localGatewayMAC)...)
+	}
+
 	if err := c.ofEntryOperations.AddAll(flows); err != nil {
 		return fmt.Errorf("failed to install flows for external communication: %v", err)
 	}
