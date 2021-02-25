@@ -1,3 +1,6 @@
+// +build !windows
+// package openflow is needed by antctl which is compiled for macOS too.
+
 // Copyright 2021 Antrea Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,19 +15,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package openflow
 
-const (
-	// HostLocalSourceBit is the bit of the iptables fwmark space to mark locally generated packets.
-	// Value must be within the range [0, 31].
-	HostLocalSourceBit = 0
+import (
+	"net"
+
+	binding "github.com/vmware-tanzu/antrea/pkg/ovs/openflow"
 )
 
-var (
-	// HostLocalSourceMark is the mark generated from HostLocalSourceBit.
-	HostLocalSourceMark = uint32(1 << HostLocalSourceBit)
+func (c *client) InstallBridgeUplinkFlows() error {
+	return nil
+}
 
-	// SNATIPMarkMask is bits of the packet mark that stores the ID of the
-	// SNAT IP for an Antrea "Pod -> external" packet, that is to be SNAT'd.
-	SNATIPMarkMask = 0xFF
-)
+func (c *client) InstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
+	return nil
+}
+
+func (c *client) UninstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
+	return nil
+}

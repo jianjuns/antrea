@@ -1306,7 +1306,7 @@ func prepareExternalFlows(nodeIP net.IP, localSubnet *net.IPNet, gwMAC net.Hardw
 					ActStr:   "goto_table:71",
 				},
 				{
-					MatchStr: fmt.Sprintf("priority=190,%s,reg0=0x80000/0x80000", ipProtoStr),
+					MatchStr: fmt.Sprintf("priority=190,%s,reg0=0/0xffff", ipProtoStr),
 					ActStr:   fmt.Sprintf("set_field:%s->eth_dst,goto_table:71", gwMAC.String()),
 				},
 			},
@@ -1324,5 +1324,74 @@ func prepareExternalFlows(nodeIP net.IP, localSubnet *net.IPNet, gwMAC net.Hardw
 				},
 			},
 		},
+	}
+}
+
+func prepareSNATMarkFlows(snatIP net.IP, mark, podOFPort uint32) []expectTableFlows {
+	var ipProtoStr, tunDstFieldName string
+	if snatIP.To4() != nil {
+		tunDstFieldName = "tun_dst"
+		ipProtoStr = "ip"
+	} else {
+		tunDstFieldName = "tun_ipv6_dst"
+		ipProtoStr = "ipv6"
+	}
+	return []expectTableFlows{
+		{
+			uint8(71),
+			[]*ofTestUtils.ExpectFlow{
+				{
+					MatchStr: fmt.Sprintf("priority=200,%s,ct_state=+new+trk,%s=%s", tunDstFieldName, ipProtoStr, snatIP),
+					ActStr:   fmt.Sprintf("load:%d->NXM_NX_PKT_MARK[0..7],goto_table:72", mark),
+				},
+				{
+					MatchStr: fmt.Sprintf("priority=200,%s,ct_state=+new+trk,in_port=%d", ipProtoStr, podOFPort),
+					ActStr:   fmt.Sprintf("load:%d->NXM_NX_PKT_MARK[0..7],goto_table:80", mark),
+				},
+			},
+		},
+	}
+}
+
+func TestSNATFlows(t *testing.T) {
+	c = ofClient.NewClient(br, bridgeMgmtAddr, ovsconfig.OVSDatapathNetdev, false, false, true)
+	err := ofTestUtils.PrepareOVSBridge(br)
+	require.Nil(t, err, fmt.Sprintf("Failed to prepare OVS bridge %s", br))
+
+	config := prepareConfiguration()
+	_, err = c.Initialize(roundInfo, config.nodeConfig, config1.TrafficEncapModeEncap)
+	require.Nil(t, err, "Failed to initialize OFClient")
+
+	defer func() {
+		err = c.Disconnect()
+		assert.Nil(t, err, fmt.Sprintf("Error while disconnecting from OVS bridge: %v", err))
+		err = ofTestUtils.DeleteOVSBridge(br)
+		assert.Nil(t, err, fmt.Sprintf("Error while deleting OVS bridge: %v", err))
+	}()
+
+	snatIP := net.ParseIP("10.10.10.14")
+	snatIPV6 := net.ParseIP("a963:ca9b:172:10::16")
+	snatMark := uint32(14)
+	snatMarkV6 := uint32(16)
+	podOFPort := uint32(104)
+	podOFPortV6 := uint32(106)
+
+	expectedFlows := append(prepareSNATMarkFlows(snatIP, snatMark, podOFPort),
+		prepareSNATMarkFlows(snatIPV6, snatMarkV6, podOFPortV6)...)
+
+	c.InstallSNATMarkFlows(snatIP, snatMark)
+	c.InstallSNATMarkFlows(snatIPV6, snatMarkV6)
+	c.InstallPodSNATFlows(podOFPort, snatMark, false)
+	c.InstallPodSNATFlows(podOFPortV6, snatMarkV6, true)
+	for _, tableFlow := range expectedFlows {
+		ofTestUtils.CheckFlowExists(t, ovsCtlClient, tableFlow.tableID, true, tableFlow.flows)
+	}
+
+	c.UninstallPodSNATFlows(podOFPort)
+	c.UninstallPodSNATFlows(podOFPortV6)
+	c.UninstallSNATMarkFlows(snatMark)
+	c.UninstallSNATMarkFlows(snatMarkV6)
+	for _, tableFlow := range expectedFlows {
+		ofTestUtils.CheckFlowExists(t, ovsCtlClient, tableFlow.tableID, false, tableFlow.flows)
 	}
 }

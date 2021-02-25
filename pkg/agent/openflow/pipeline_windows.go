@@ -22,6 +22,7 @@ import (
 
 	"github.com/vmware-tanzu/antrea/pkg/agent/config"
 	"github.com/vmware-tanzu/antrea/pkg/agent/openflow/cookie"
+	"github.com/vmware-tanzu/antrea/pkg/agent/types"
 	binding "github.com/vmware-tanzu/antrea/pkg/ovs/openflow"
 )
 
@@ -119,17 +120,15 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 	snatIPRange := &binding.IPRange{StartIP: nodeIP, EndIP: nodeIP}
 	l3FwdTable := c.pipeline[l3ForwardingTable]
 	nextTable := l3FwdTable.GetNext()
+	ctCommitTable := c.pipeline[conntrackCommitTable]
+	ccNextTable := ctCommitTable.GetNext()
 	flows := []binding.Flow{
 		// Default to using Node IP as the SNAT IP for local Pods.
 		c.pipeline[snatTable].BuildFlow(priorityLow).
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(true).MatchCTStateTrk(true).
 			MatchRegRange(int(marksReg), markTrafficFromLocal, binding.Range{0, 15}).
-<<<<<<< HEAD
 			Action().LoadRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
-=======
-			Action().LoadRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
->>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
 			Action().GotoTable(nextTable).
 			Cookie(c.cookieAllocator.Request(category).Raw()).
 			Done(),
@@ -143,15 +142,11 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 		// packet has these characteristics: 1) the ct_state is
 		// "+new+trk", 2) reg0[17] is set to 1; 3) ct_mark is set to
 		// 0x40.
-		c.pipeline[conntrackCommitTable].BuildFlow(priorityNormal).
+		ctCommitTable.BuildFlow(priorityNormal).
 			MatchProtocol(binding.ProtocolIP).
 			MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(false).
-<<<<<<< HEAD
 			MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
-=======
-			MatchRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
->>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
-			Action().CT(true, L2ForwardingOutTable, CtZone).
+			Action().CT(true, ccNextTable, CtZone).
 			SNAT(snatIPRange, nil).
 			LoadToMark(snatCTMark).CTDone().
 			Cookie(c.cookieAllocator.Request(category).Raw()).
@@ -160,52 +155,40 @@ func (c *client) snatImplementationFlows(nodeIP net.IP, category cookie.Category
 	// The following flows are for both apply DNAT + SNAT for packets.
 	// If AntreaProxy is disabled, no DNAT happens in OVS pipeline.
 	if c.enableProxy {
-<<<<<<< HEAD
-		// If the SNAT is needed after DNAT, mark the snatDefaultMark even the connection is not new.
-=======
-		// If the SNAT is needed after DNAT, mark the snatRequiredMark even the connection is not new.
->>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
-		// Because this kind of packets need to enter ctZoneSNAT to make sure the SNAT can be applied
-		// before leaving the pipeline.
-		flows = append(flows, l3FwdTable.BuildFlow(priorityLow).
-			MatchProtocol(binding.ProtocolIP).
-			MatchCTStateNew(false).MatchCTStateTrk(true).MatchCTStateDNAT(true).
-			MatchRegRange(int(marksReg), markTrafficFromLocal, binding.Range{0, 15}).
-<<<<<<< HEAD
-			Action().LoadRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
-=======
-			Action().LoadRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
->>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
-			Action().GotoTable(nextTable).
-			Cookie(c.cookieAllocator.Request(category).Raw()).
-			Done())
-		// If SNAT is needed after DNAT:
-		//   - For new connection: commit to ctZoneSNAT
-		//   - For existing connection: enter ctZoneSNAT to apply SNAT
-		flows = append(flows, c.pipeline[conntrackCommitTable].BuildFlow(priorityNormal).
-			MatchProtocol(binding.ProtocolIP).
-			MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(true).
-<<<<<<< HEAD
-			MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
-=======
-			MatchRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
->>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
-			Action().CT(true, L2ForwardingOutTable, ctZoneSNAT).
-			SNAT(snatIPRange, nil).
-			LoadToMark(snatCTMark).CTDone().
-			Cookie(c.cookieAllocator.Request(category).Raw()).
-			Done())
-		flows = append(flows, c.pipeline[conntrackCommitTable].BuildFlow(priorityNormal).
-			MatchProtocol(binding.ProtocolIP).
-			MatchCTStateNew(false).MatchCTStateTrk(true).MatchCTStateDNAT(true).
-<<<<<<< HEAD
-			MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
-=======
-			MatchRegRange(int(marksReg), snatRequiredMark, snatMarkRange).
->>>>>>> Refactor Windows SNAT flows for SNAT policy implementation
-			Action().CT(false, L2ForwardingOutTable, ctZoneSNAT).NAT().CTDone().
-			Cookie(c.cookieAllocator.Request(category).Raw()).
-			Done())
+		flows = append(flows, []binding.Flow{
+			// If the SNAT is needed after DNAT, mark the
+			// snatDefaultMark even the connection is not new,
+			// because this kind of packets need to enter ctZoneSNAT
+			// to make sure the SNAT can be applied before leaving
+			// the pipeline.
+			l3FwdTable.BuildFlow(priorityLow).
+				MatchProtocol(binding.ProtocolIP).
+				MatchCTStateNew(false).MatchCTStateTrk(true).MatchCTStateDNAT(true).
+				MatchRegRange(int(marksReg), markTrafficFromLocal, binding.Range{0, 15}).
+				Action().LoadRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+				Action().GotoTable(nextTable).
+				Cookie(c.cookieAllocator.Request(category).Raw()).
+				Done(),
+			// If SNAT is needed after DNAT:
+			//   - For new connection: commit to ctZoneSNAT
+			//   - For existing connection: enter ctZoneSNAT to apply SNAT
+			ctCommitTable.BuildFlow(priorityNormal).
+				MatchProtocol(binding.ProtocolIP).
+				MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(true).
+				MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+				Action().CT(true, ccNextTable, ctZoneSNAT).
+				SNAT(snatIPRange, nil).
+				LoadToMark(snatCTMark).CTDone().
+				Cookie(c.cookieAllocator.Request(category).Raw()).
+				Done(),
+			ctCommitTable.BuildFlow(priorityNormal).
+				MatchProtocol(binding.ProtocolIP).
+				MatchCTStateNew(false).MatchCTStateTrk(true).MatchCTStateDNAT(true).
+				MatchRegRange(int(marksReg), snatDefaultMark, snatMarkRange).
+				Action().CT(false, ccNextTable, ctZoneSNAT).NAT().CTDone().
+				Cookie(c.cookieAllocator.Request(category).Raw()).
+				Done(),
+		}...)
 	}
 	return flows
 }
@@ -215,6 +198,38 @@ func (c *client) externalFlows(nodeIP net.IP, localSubnet net.IPNet, localGatewa
 	flows := c.snatCommonFlows(nodeIP, localSubnet, localGatewayMAC, cookie.SNAT)
 	flows = append(flows, c.uplinkSNATFlows(localSubnet, cookie.SNAT)...)
 	flows = append(flows, c.snatImplementationFlows(nodeIP, cookie.SNAT)...)
+	return flows
+}
+
+func (c *client) snatMarkFlows(snatIP net.IP, mark uint32) []binding.Flow {
+	ipProto := getIPProtocol(snatIP)
+	snatIPRange := &binding.IPRange{StartIP: snatIP, EndIP: snatIP}
+	ctCommitTable := c.pipeline[conntrackCommitTable]
+	nextTable := ctCommitTable.GetNext()
+	flows := []binding.Flow{
+		c.snatIPFromTunnelFlow(snatIP, mark),
+		ctCommitTable.BuildFlow(priorityNormal).
+			MatchProtocol(binding.ProtocolIP).
+			MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(false).
+			MatchPktMark(mark, &types.SNATIPMarkMask).
+			Action().CT(true, nextTable, CtZone).
+			SNAT(snatIPRange, nil).
+			LoadToMark(snatCTMark).CTDone().
+			Cookie(c.cookieAllocator.Request(cookie.SNAT).Raw()).
+			Done(),
+	}
+
+	if c.enableAntreaProxy {
+		flows = append(flows, ctCommitTable.BuildFlow(priorityNormal).
+			MatchProtocol(binding.ProtocolIP).
+			MatchCTStateNew(true).MatchCTStateTrk(true).MatchCTStateDNAT(true).
+			MatchPktMark(mark, &types.SNATIPMarkMask).
+			Action().CT(true, nextTable, ctZoneSNAT).
+			SNAT(snatIPRange, nil).
+			LoadToMark(snatCTMark).CTDone().
+			Cookie(c.cookieAllocator.Request(cookie.SNAT).Raw()).
+			Done())
+	}
 	return flows
 }
 
@@ -271,29 +286,4 @@ func (c *client) hostBridgeUplinkFlows(localSubnet net.IPNet, category cookie.Ca
 			Done(),
 	}
 	return flows
-}
-
-func (c *client) installBridgeUplinkFlows() error {
-	flows := c.hostBridgeUplinkFlows(*c.nodeConfig.PodIPv4CIDR, cookie.Default)
-	if err := c.ofEntryOperations.AddAll(flows); err != nil {
-		return err
-	}
-	c.hostNetworkingFlows = flows
-	return nil
-}
-
-func (c *client) installLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	c.replayMutex.RLock()
-	defer c.replayMutex.RUnlock()
-	var flows []binding.Flow
-	flows = append(flows, c.loadBalancerServiceFromOutsideFlow(svcIP, svcPort, protocol))
-	cacheKey := fmt.Sprintf("LoadBalancerService_%s_%d_%s", svcIP, svcPort, protocol)
-	return c.addFlows(c.serviceFlowCache, cacheKey, flows)
-}
-
-func (c *client) uninstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	c.replayMutex.RLock()
-	defer c.replayMutex.RUnlock()
-	cacheKey := fmt.Sprintf("LoadBalancerService_%s_%d_%s", svcIP, svcPort, protocol)
-	return c.deleteFlows(c.serviceFlowCache, cacheKey)
 }

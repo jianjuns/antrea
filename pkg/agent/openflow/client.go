@@ -157,6 +157,25 @@ type Client interface {
 	// SNAT with the Openflow NAT action.
 	InstallExternalFlows() error
 
+	// InstallSNATMarkFlows installs flows for a local SNAT IP. On Linux, a
+	// single flow is added to mark the packets tunnelled from remote Nodes
+	// that should be SNAT'd with the SNAT IP. On Windows, an extra flow is
+	// added to perform SNAT for the marked packets with the SNAT IP.
+	InstallSNATMarkFlows(snatIP net.IP, mark uint32) error
+
+	// UninstallSNATMarkFlows removes the flows installed to set the packet
+	// mark for a SNAT IP.
+	UninstallSNATMarkFlows(mark uint32) error
+
+	// InstallSNATPolicyFlow installs the SNAT policy flows for a local Pod.
+	// which set the SNAT IP mark on the packets from the ofPort to external.
+	// As of now, a Pod can be configured with a single SNAT IP in a single
+	// address family (IPv4 or IPv6).
+	InstallPodSNATFlows(ofPort uint32, snatMark uint32, isIPv6 bool) error
+
+	// UninstallPodSNATFlows removes the SNAT policy flows for the local Pod.
+	UninstallPodSNATFlows(ofPort uint32) error
+
 	// Disconnect disconnects the connection between client and OFSwitch.
 	Disconnect() error
 
@@ -477,14 +496,6 @@ func (c *client) UninstallServiceFlows(svcIP net.IP, svcPort uint16, protocol bi
 	return c.deleteFlows(c.serviceFlowCache, cacheKey)
 }
 
-func (c *client) InstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	return c.installLoadBalancerServiceFromOutsideFlows(svcIP, svcPort, protocol)
-}
-
-func (c *client) UninstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	return c.uninstallLoadBalancerServiceFromOutsideFlows(svcIP, svcPort, protocol)
-}
-
 func (c *client) GetServiceFlowKeys(svcIP net.IP, svcPort uint16, protocol binding.Protocol, endpoints []proxy.Endpoint) []string {
 	cacheKey := generateServicePortFlowCacheKey(svcIP, svcPort, protocol)
 	flowKeys := c.getFlowKeysFromCache(c.serviceFlowCache, cacheKey)
@@ -572,10 +583,6 @@ func (c *client) InstallDefaultTunnelFlows() error {
 	return nil
 }
 
-func (c *client) InstallBridgeUplinkFlows() error {
-	return c.installBridgeUplinkFlows()
-}
-
 func (c *client) initialize() error {
 	if err := c.ofEntryOperations.AddAll(c.defaultFlows()); err != nil {
 		return fmt.Errorf("failed to install default flows: %v", err)
@@ -657,6 +664,41 @@ func (c *client) InstallExternalFlows() error {
 	}
 	c.hostNetworkingFlows = append(c.hostNetworkingFlows, flows...)
 	return nil
+}
+
+func (c *client) InstallSNATMarkFlows(snatIP net.IP, mark uint32) error {
+	c.replayMutex.RLock()
+	defer c.replayMutex.RUnlock()
+	flows := c.snatMarkFlows(snatIP, mark)
+	cacheKey := fmt.Sprintf("s%x", mark)
+	return c.addFlows(c.snatFlowCache, cacheKey, flows)
+}
+
+func (c *client) UninstallSNATMarkFlows(mark uint32) error {
+	c.replayMutex.RLock()
+	defer c.replayMutex.RUnlock()
+	cacheKey := fmt.Sprintf("s%x", mark)
+	return c.deleteFlows(c.snatFlowCache, cacheKey)
+}
+
+func (c *client) InstallPodSNATFlows(ofPort uint32, snatMark uint32, isIPv6 bool) error {
+	c.replayMutex.RLock()
+	defer c.replayMutex.RUnlock()
+	flows := make([]binding.Flow, 0, 2)
+	if !isIPv6 {
+		flows = append(flows, c.snatRuleFlow(ofPort, snatMark, binding.ProtocolIP))
+	} else {
+		flows = append(flows, c.snatRuleFlow(ofPort, snatMark, binding.ProtocolIPv6))
+	}
+	cacheKey := fmt.Sprintf("p%x", ofPort)
+	return c.addFlows(c.snatFlowCache, cacheKey, flows)
+}
+
+func (c *client) UninstallPodSNATFlows(ofPort uint32) error {
+	c.replayMutex.RLock()
+	defer c.replayMutex.RUnlock()
+	cacheKey := fmt.Sprintf("p%x", ofPort)
+	return c.deleteFlows(c.snatFlowCache, cacheKey)
 }
 
 func (c *client) ReplayFlows() {

@@ -26,20 +26,12 @@ import (
 
 // externalFlows returns the flows needed to enable SNAT for external traffic.
 func (c *client) externalFlows(nodeIP net.IP, localSubnet net.IPNet, localGatewayMAC net.HardwareAddr) []binding.Flow {
-	if !c.enableSNATPolicy {
+	if !c.enableEgress {
 		return nil
 	}
 	return c.snatCommonFlows(nodeIP, localSubnet, localGatewayMAC, cookie.SNAT)
 }
 
-func (c *client) installBridgeUplinkFlows() error {
-	return nil
-}
-
-func (c *client) installLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	return nil
-}
-
-func (c *client) uninstallLoadBalancerServiceFromOutsideFlows(svcIP net.IP, svcPort uint16, protocol binding.Protocol) error {
-	return nil
+func (c *client) snatMarkFlows(snatIP net.IP, mark uint32) []binding.Flow {
+	return []binding.Flow{c.snatIPFromTunnelFlow(snatIP, mark)}
 }
