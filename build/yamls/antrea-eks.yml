@@ -1218,6 +1218,16 @@ spec:
       name: Destination-IP
       priority: 10
       type: string
+    - description: Trace live traffic.
+      jsonPath: .spec.liveTraffic
+      name: Live-Traffic
+      priority: 10
+      type: boolean
+    - description: Timeout in seconds.
+      jsonPath: .spec.timeout
+      name: Timeout
+      priority: 10
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -1228,15 +1238,6 @@ spec:
           spec:
             properties:
               destination:
-                oneOf:
-                - required:
-                  - pod
-                  - namespace
-                - required:
-                  - service
-                  - namespace
-                - required:
-                  - ip
                 properties:
                   ip:
                     pattern: ^(((([1]?\d)?\d|2[0-4]\d|25[0-5])\.){3}(([1]?\d)?\d|2[0-4]\d|25[0-5]))|([\da-fA-F]{1,4}(\:[\da-fA-F]{1,4}){7})|(([\da-fA-F]{1,4}:){0,5}::([\da-fA-F]{1,4}:){0,5}[\da-fA-F]{1,4})$
@@ -1248,6 +1249,8 @@ spec:
                   service:
                     type: string
                 type: object
+              liveTraffic:
+                type: boolean
               packet:
                 properties:
                   ipHeader:
@@ -1309,9 +1312,10 @@ spec:
                 - pod
                 - namespace
                 type: object
+              timeout:
+                type: integer
             required:
             - source
-            - destination
             type: object
           status:
             properties:
@@ -1412,15 +1416,6 @@ spec:
           spec:
             properties:
               destination:
-                oneOf:
-                - required:
-                  - pod
-                  - namespace
-                - required:
-                  - service
-                  - namespace
-                - required:
-                  - ip
                 properties:
                   ip:
                     pattern: ^(((([1]?\d)?\d|2[0-4]\d|25[0-5])\.){3}(([1]?\d)?\d|2[0-4]\d|25[0-5]))|([\da-fA-F]{1,4}(\:[\da-fA-F]{1,4}){7})|(([\da-fA-F]{1,4}:){0,5}::([\da-fA-F]{1,4}:){0,5}[\da-fA-F]{1,4})$
@@ -1495,7 +1490,6 @@ spec:
                 type: object
             required:
             - source
-            - destination
             type: object
           status:
             properties:
