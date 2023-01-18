@@ -14,16 +14,16 @@
 package main
 
 import (
+	"antrea.io/antrea/multicluster/controllers"
+	"antrea.io/antrea/multicluster/controllers/leader"
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	multiclusterv1alpha1 "antrea.io/antrea/multicluster/apis/multicluster/v1alpha1"
-	multiclustercontrollers "antrea.io/antrea/multicluster/controllers/multicluster"
 	"antrea.io/antrea/pkg/log"
 	"antrea.io/antrea/pkg/signals"
 	"antrea.io/antrea/pkg/util/env"
@@ -59,7 +59,7 @@ func runLeader(o *Options) error {
 		return err
 	}
 
-	memberClusterStatusManager := multiclustercontrollers.NewMemberClusterAnnounceReconciler(
+	memberClusterStatusManager := leader.NewMemberClusterAnnounceReconciler(
 		mgr.GetClient(), mgr.GetScheme())
 	if err = memberClusterStatusManager.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("error creating MemberClusterAnnounce controller: %v", err)
@@ -75,7 +75,7 @@ func runLeader(o *Options) error {
 			Client:    noCachedClient,
 			namespace: env.GetPodNamespace()}})
 
-	clusterSetReconciler := &multiclustercontrollers.LeaderClusterSetReconciler{
+	clusterSetReconciler := &leader.LeaderClusterSetReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		StatusManager: memberClusterStatusManager,
@@ -84,14 +84,14 @@ func runLeader(o *Options) error {
 		return fmt.Errorf("error creating ClusterSet controller: %v", err)
 	}
 
-	resExportReconciler := &multiclustercontrollers.ResourceExportReconciler{
+	resExportReconciler := &leader.ResourceExportReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme()}
 	if err = resExportReconciler.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("error creating ResourceExport controller: %v", err)
 	}
 	if o.EnableStretchedNetworkPolicy {
-		labelExportReconciler := multiclustercontrollers.NewLabelIdentityExportReconciler(
+		labelExportReconciler := leader.NewLabelIdentityExportReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			env.GetPodNamespace())
@@ -104,12 +104,12 @@ func runLeader(o *Options) error {
 	if err = (&multiclusterv1alpha1.ResourceExport{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("error creating ResourceExport webhook: %v", err)
 	}
-	staleController := multiclustercontrollers.NewStaleResCleanupController(
+	staleController := controllers.NewStaleResCleanupController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		env.GetPodNamespace(),
 		nil,
-		multiclustercontrollers.LeaderCluster,
+		controllers.LeaderCluster,
 	)
 
 	go staleController.Run(stopCh)

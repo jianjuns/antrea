@@ -15,11 +15,19 @@
 package multicluster
 
 import (
+	"antrea.io/antrea/multicluster/controllers/member"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
+	"antrea.io/antrea/multicluster/apis/multicluster/v1alpha1"
+	mcinformers "antrea.io/antrea/multicluster/pkg/client/informers/externalversions/multicluster/v1alpha1"
+	mclisters "antrea.io/antrea/multicluster/pkg/client/listers/multicluster/v1alpha1"
+	"antrea.io/antrea/pkg/agent/interfacestore"
+	"antrea.io/antrea/pkg/agent/openflow"
+	antreatypes "antrea.io/antrea/pkg/agent/types"
+	"antrea.io/antrea/pkg/util/channel"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,16 +36,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
-
-	"antrea.io/antrea/multicluster/apis/multicluster/v1alpha1"
-	"antrea.io/antrea/multicluster/controllers/multicluster"
-	mcinformers "antrea.io/antrea/multicluster/pkg/client/informers/externalversions/multicluster/v1alpha1"
-	mclisters "antrea.io/antrea/multicluster/pkg/client/listers/multicluster/v1alpha1"
-	"antrea.io/antrea/pkg/agent/interfacestore"
-	"antrea.io/antrea/pkg/agent/openflow"
-	antreatypes "antrea.io/antrea/pkg/agent/types"
-	"antrea.io/antrea/pkg/util/channel"
 )
 
 const (
@@ -211,7 +209,7 @@ func (s *StretchedNetworkPolicyController) syncPodClassifierFlow(podRef types.Na
 	if err != nil {
 		return fmt.Errorf("can't get Namespace %s: %v", podRef.Namespace, err)
 	}
-	normalizedLabel := multicluster.GetNormalizedLabel(podNS.Labels, pod.Labels, podNS.Name)
+	normalizedLabel := member.GetNormalizedLabel(podNS.Labels, pod.Labels, podNS.Name)
 	labelID := s.getLabelIdentity(podRef, normalizedLabel)
 	return s.ofClient.InstallPodFlows(
 		containerConfigs[0].InterfaceName,

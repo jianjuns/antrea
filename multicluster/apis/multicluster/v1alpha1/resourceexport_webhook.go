@@ -17,11 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"antrea.io/antrea/multicluster/controllers/multicluster/common"
+	"antrea.io/antrea/multicluster/controllers/common"
 )
 
 func (r *ResourceExport) SetupWebhookWithManager(mgr ctrl.Manager) error {

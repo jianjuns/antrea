@@ -16,14 +16,14 @@ limitations under the License.
 package main
 
 import (
+	"antrea.io/antrea/multicluster/controllers"
+	"antrea.io/antrea/multicluster/controllers/member"
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	multiclustercontrollers "antrea.io/antrea/multicluster/controllers/multicluster"
 	"antrea.io/antrea/pkg/log"
 	"antrea.io/antrea/pkg/signals"
 	"antrea.io/antrea/pkg/util/env"
@@ -62,7 +62,7 @@ func runMember(o *Options) error {
 			Client:    mgr.GetClient(),
 			namespace: env.GetPodNamespace()}})
 
-	clusterSetReconciler := multiclustercontrollers.NewMemberClusterSetReconciler(mgr.GetClient(),
+	clusterSetReconciler := member.NewMemberClusterSetReconciler(mgr.GetClient(),
 		mgr.GetScheme(),
 		env.GetPodNamespace(),
 		o.EnableStretchedNetworkPolicy,
@@ -72,7 +72,7 @@ func runMember(o *Options) error {
 	}
 
 	commonAreaGetter := clusterSetReconciler
-	svcExportReconciler := multiclustercontrollers.NewServiceExportReconciler(
+	svcExportReconciler := member.NewServiceExportReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		commonAreaGetter,
@@ -81,7 +81,7 @@ func runMember(o *Options) error {
 		return fmt.Errorf("error creating ServiceExport controller: %v", err)
 	}
 	if o.EnableStretchedNetworkPolicy {
-		labelIdentityReconciler := multiclustercontrollers.NewLabelIdentityReconciler(
+		labelIdentityReconciler := member.NewLabelIdentityReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			commonAreaGetter)
@@ -91,7 +91,7 @@ func runMember(o *Options) error {
 		go labelIdentityReconciler.Run(stopCh)
 	}
 
-	gwReconciler := multiclustercontrollers.NewGatewayReconciler(
+	gwReconciler := member.NewGatewayReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		env.GetPodNamespace(),
@@ -102,7 +102,7 @@ func runMember(o *Options) error {
 		return fmt.Errorf("error creating Gateway controller: %v", err)
 	}
 
-	nodeReconciler := multiclustercontrollers.NewNodeReconciler(
+	nodeReconciler := member.NewNodeReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		env.GetPodNamespace(),
@@ -111,12 +111,12 @@ func runMember(o *Options) error {
 		return fmt.Errorf("error creating Node controller: %v", err)
 	}
 
-	staleController := multiclustercontrollers.NewStaleResCleanupController(
+	staleController := controllers.NewStaleResCleanupController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		env.GetPodNamespace(),
 		commonAreaGetter,
-		multiclustercontrollers.MemberCluster,
+		controllers.MemberCluster,
 	)
 
 	go staleController.Run(stopCh)

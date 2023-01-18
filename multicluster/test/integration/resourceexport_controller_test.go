@@ -15,11 +15,10 @@
 package integration
 
 import (
+	"antrea.io/antrea/multicluster/controllers/leader"
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,8 +27,7 @@ import (
 	mcs "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
 	mcsv1alpha1 "antrea.io/antrea/multicluster/apis/multicluster/v1alpha1"
-	multiclustercontrollers "antrea.io/antrea/multicluster/controllers/multicluster"
-	"antrea.io/antrea/multicluster/controllers/multicluster/common"
+	"antrea.io/antrea/multicluster/controllers/common"
 )
 
 // This file contains test cases for below basic scenarios:
@@ -172,10 +170,10 @@ var _ = Describe("ResourceExport controller", func() {
 			},
 		},
 	}
-	svcResImportName := multiclustercontrollers.GetResourceImportName(svcResExportA)
-	epResImportName := multiclustercontrollers.GetResourceImportName(epResExportA)
+	svcResImportName := leader.GetResourceImportName(svcResExportA)
+	epResImportName := leader.GetResourceImportName(epResExportA)
 	expectedSvcImportSpec := mcs.ServiceImportSpec{
-		Ports: multiclustercontrollers.SvcPortsConverter(svcPorts),
+		Ports: leader.SvcPortsConverter(svcPorts),
 		Type:  mcs.ClusterSetIP,
 	}
 	ctx := context.Background()
