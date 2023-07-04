@@ -68,9 +68,9 @@ Kubernetes: `>= 1.16.0-0`
 | controller.tolerations | list | `[{"key":"CriticalAddonsOnly","operator":"Exists"},{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"},{"effect":"NoSchedule","key":"node-role.kubernetes.io/control-plane"}]` | Tolerations for the antrea-controller Pod. |
 | defaultMTU | int | `0` | Default MTU to use for the host gateway interface and the network interface of each Pod. By default, antrea-agent will discover the MTU of the Node's primary interface and adjust it to accommodate for tunnel encapsulation overhead if applicable. |
 | disableTXChecksumOffload | bool | `false` | Disable TX checksum offloading for container network interfaces. It's supposed to be set to true when the datapath doesn't support TX checksum offloading, which causes packets to be dropped due to bad checksum. It affects Pods running on Linux Nodes only. |
-| dnsServerOverride | string | `""` | Address of DNS server, to override the kube-dns service. It's used to resolve hostname in FQDN policy. |
+| dnsServerOverride | string | `""` | Address of DNS server, to override the kube-dns Service. It's used to resolve hostnames in a FQDN policy. |
 | egress.exceptCIDRs | list | `[]` | CIDR ranges to which outbound Pod traffic will not be SNAT'd by Egresses. |
-| egress.maxEgressIPsPerNode | int | `255` | The maximum number of Egress IPs that can be assigned to a Node. It's useful when the Node network restricts the number of secondary IPs a Node can have, e.g. EKS. It must not be greater than 255. |
+| egress.maxEgressIPsPerNode | int | `255` | The maximum number of Egress IPs that can be assigned to a Node. It is useful when the Node network restricts the number of secondary IPs a Node can have, e.g. EKS. It must not be greater than 255. |
 | enableBridgingMode | bool | `false` | Enable bridging mode of Pod network on Nodes, in which the Node's transport interface is connected to the OVS bridge. |
 | featureGates | object | `{}` | To explicitly enable or disable a FeatureGate and bypass the Antrea defaults, add an entry to the dictionary with the FeatureGate's name as the key and a boolean as the value. |
 | flowExporter.activeFlowExportTimeout | string | `"5s"` | timeout after which a flow record is sent to the collector for active flows. |
@@ -107,12 +107,7 @@ Kubernetes: `>= 1.16.0-0`
 | nodePortLocal.portRange | string | `"61000-62000"` | Port range used by NodePortLocal when creating Pod port mappings. |
 | ovs.bridgeName | string | `"br-int"` | Name of the OVS bridge antrea-agent will create and use. |
 | ovs.hwOffload | bool | `false` | Enable hardware offload for the OVS bridge (required additional configuration). |
-| secondaryNetwork.ovs.datapathType | string | `"system"` | 'system' is the default value and corresponds to the kernel datapath. Use 'netdev' to run OVS in userspace mode. Userspace mode requires the tun device driver to be available. |
-| secondaryNetwork.ovs.enable | bool | `false` | Enable OVS bridge configuration for secondary network. |
-| secondaryNetwork.ovs.integrationBridgeName | string | `"br-secnet-int"` | Secondary network OVS integration bridge name. |
-| secondaryNetwork.ovs.patchPort | string | `"br-secnet-patch0"` | Name of the OVS patch port which connects the integration and transport bridge. |
-| secondaryNetwork.ovs.transportBridgeName | string | `"br-secnet-trans"` | Secondary network OVS transport bridge name. |
-| secondaryNetwork.tunnelType | string | `"geneve"` | Tunnel protocol used for encapsulating traffic across Nodes. It must be one of "geneve", "vxlan", "gre", "stt". |
+| secondaryNetwork.ovsBridges | list | `[]` | Configuration of OVS bridges for secondary network. At the moment, at most one OVS bridge can be specified. If the specified bridge does not exist on the Node, antrea-agent will create it based on the configuration. The following configuration specifies an OVS bridge with name "br1" and a physical interface "eth1": [{bridgeName: "br1", physicalInterfaces: ["eth1"]}] |
 | serviceCIDR | string | `""` | IPv4 CIDR range used for Services. Required when AntreaProxy is disabled. |
 | serviceCIDRv6 | string | `""` | IPv6 CIDR range used for Services. Required when AntreaProxy is disabled. |
 | testing.coverage | bool | `false` | Enable code coverage measurement (used when testing Antrea only). |

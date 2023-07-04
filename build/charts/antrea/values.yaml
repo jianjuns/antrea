@@ -74,24 +74,13 @@ ovs:
   hwOffload: false
 
 secondaryNetwork:
-  ovs:
-    # -- Enable OVS bridge configuration for secondary network.
-    enable: false
-    # -- Secondary network OVS integration bridge name.
-    integrationBridgeName: "br-secnet-int"
-    # -- Secondary network OVS transport bridge name.
-    transportBridgeName: "br-secnet-trans"
-    # -- Datapath type to use for the OpenVSwitch bridge created by Antrea. Supported values are:
-    # - system
-    # - netdev
-    # -- 'system' is the default value and corresponds to the kernel datapath. Use 'netdev' to run
-    # OVS in userspace mode. Userspace mode requires the tun device driver to be available.
-    datapathType: "system"
-    # -- Name of the OVS patch port which connects the integration and transport bridge.
-    patchPort: "br-secnet-patch0"
-  # -- Tunnel protocol used for encapsulating traffic across Nodes. It must be one
-  # of "geneve", "vxlan", "gre", "stt".
-  tunnelType: "geneve"
+  # -- Configuration of OVS bridges for secondary network. At the moment, at
+  # most one OVS bridge can be specified. If the specified bridge does not exist
+  # on the Node, antrea-agent will create it based on the configuration.
+  # The following configuration specifies an OVS bridge with name "br1" and a
+  # physical interface "eth1":
+  # [{bridgeName: "br1", physicalInterfaces: ["eth1"]}]
+  ovsBridges: []
 
 wireGuard:
   # -- Port for WireGuard to send and receive traffic.
@@ -113,8 +102,9 @@ ipsec:
 egress:
   # -- CIDR ranges to which outbound Pod traffic will not be SNAT'd by Egresses.
   exceptCIDRs: []
-  # -- The maximum number of Egress IPs that can be assigned to a Node. It's useful when the Node network restricts
-  # the number of secondary IPs a Node can have, e.g. EKS. It must not be greater than 255.
+  # -- The maximum number of Egress IPs that can be assigned to a Node. It is
+  # useful when the Node network restricts the number of secondary IPs a Node
+  # can have, e.g. EKS. It must not be greater than 255.
   maxEgressIPsPerNode: 255
 
 nodePortLocal:
@@ -141,8 +131,8 @@ antreaProxy:
   # will only handle Services without the "service.kubernetes.io/service-proxy-name"
   # label, but ignore Services with the label no matter what is the value.
   serviceProxyName: ""
-  # -- Determines how external traffic is processed when it's load balanced across Nodes by default. It must be one of "nat" or
-  # "dsr".
+  # -- Determines how external traffic is processed when it's load balanced
+  # across Nodes by default. It must be one of "nat" or "dsr".
   defaultLoadBalancerMode: "nat"
 
 nodeIPAM:
@@ -162,8 +152,8 @@ nodeIPAM:
 # -- Address of Kubernetes apiserver, to override any value provided in
 # kubeconfig or InClusterConfig.
 kubeAPIServerOverride: ""
-# -- Address of DNS server, to override the kube-dns service. It's used to
-# resolve hostname in FQDN policy.
+# -- Address of DNS server, to override the kube-dns Service. It's used to
+# resolve hostnames in a FQDN policy.
 dnsServerOverride: ""
 # -- IPv4 CIDR range used for Services. Required when AntreaProxy is disabled.
 serviceCIDR: ""

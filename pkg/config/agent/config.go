@@ -147,13 +147,14 @@ type AgentConfig struct {
 	NodePortLocal NodePortLocalConfig `yaml:"nodePortLocal,omitempty"`
 	// FlowExporter configuration options.
 	FlowExporter FlowExporterConfig `yaml:"flowExporter,omitempty"`
-	// Provide the address of Kubernetes apiserver, to override any value provided in kubeconfig or InClusterConfig.
-	// It is typically used when kube-proxy is not deployed (replaced by AntreaProxy).
+	// Provide the address of Kubernetes apiserver, to override any value provided in kubeconfig or
+	// InClusterConfig. It is typically used when kube-proxy is not deployed (replaced by AntreaProxy).
 	// Defaults to "". It must be a host string, a host:port pair, or a URL to the base of the apiserver.
 	KubeAPIServerOverride string `yaml:"kubeAPIServerOverride,omitempty"`
-	// Provide the address of DNS server, to override the kube-dns service. It's used to resolve hostname in FQDN policy.
-	// Defaults to "". It must be a host string or a host:port pair of the DNS server (e.g. 10.96.0.10, 10.96.0.10:53,
-	// [fd00:10:96::a]:53).
+	// Provide the address of DNS server, to override the kube-dns Service. It's used to resolve
+	// hostnames in a FQDN policy.
+	// Defaults to "". It must be a host string or a host:port pair of the DNS server (e.g. 10.96.0.10,
+	// 10.96.0.10:53, [fd00:10:96::a]:53).
 	DNSServerOverride string `yaml:"dnsServerOverride,omitempty"`
 	// Cipher suites to use.
 	TLSCipherSuites string `yaml:"tlsCipherSuites,omitempty"`
@@ -369,21 +370,14 @@ type PolicyBypassRule struct {
 }
 
 type SecondaryNetworkConfig struct {
-	// Secondary network specific OVS configuration.
-	OVS SecondaryNetworkOVSConfig `yaml:"ovs,omitempty"`
-	// TunnelType to be used for node to node transport, which is part of the same virtual network.
-	TunnelType string `yaml:"tunnelType,omitempty"`
+	// Configuration of OVS bridges for secondary networks. At the moment, only a
+	// single OVS bridge is supported.
+	OVSBridges []OVSBridgeConfig `yaml:"ovsBridges,omitempty"`
 }
 
-type SecondaryNetworkOVSConfig struct {
-	// Enable Antrea's native secondary network OVS configuration.
-	Enable bool `yaml:"enable,omitempty"`
-	// OVS integration bridge name.
-	OVSIntegrationBridgeName string `yaml:"ovsIntegrationBridgeName,omitempty"`
-	// OVS transport bridge name.
-	OVSTransportBridgeName string `yaml:"ovsTransportBridgeName,omitempty"`
-	// OVS Datapath type to use for the OpenVSwitch bridge created by Antrea.
-	OVSDatapathType string `yaml:"ovsDatapathType,omitempty"`
-	// OVS patch port which connects the integration and transport bridge.
-	OVSPatchPort string `yaml:"ovsPatchPort,omitempty"`
+type OVSBridgeConfig struct {
+	BridgeName string `yaml:"bridgeName"`
+	// Names of physical interfaces to be connected to the bridge. At the moment,
+	// only a single physical interface is supported.
+	PhysicalInterfaces []string `yaml:"physicalInterfaces,omitempty"`
 }
