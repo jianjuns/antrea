@@ -145,7 +145,7 @@ func testIPAMResult(cidr string) *current.Result {
 }
 
 func init() {
-	getPodContainerDeviceIDs = func(name string, namespace string) ([]string, error) {
+	getPodContainerDeviceIDsFn = func(name string, namespace string) ([]string, error) {
 		return []string{sriovDeviceID}, nil
 	}
 }
@@ -159,14 +159,14 @@ func TestPodControllerRun(t *testing.T) {
 	interfaceConfigurator := podwatchtesting.NewMockInterfaceConfigurator(ctrl)
 	mockIPAM := ipamtesting.NewMockIPAMDelegator(ctrl)
 	ipamDelegator = mockIPAM
-	podController := NewPodController(
+	podController, _ := NewPodController(
 		client,
 		netdefclient,
 		informerFactory.Core().V1().Pods().Informer(),
 		testNode,
 		podCache,
-		interfaceConfigurator,
-	)
+		nil)
+	podController.interfaceConfigurator = interfaceConfigurator
 
 	stopCh := make(chan struct{})
 	informerFactory.Start(stopCh)

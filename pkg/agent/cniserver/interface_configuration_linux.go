@@ -249,7 +249,7 @@ func (ic *ifConfigurator) configureContainerLinkVeth(
 	mtu int,
 	result *current.Result,
 ) error {
-	hostIfaceName := util.GenerateContainerInterfaceName(podName, podNamespace, containerID)
+	hostIfaceName := util.GenerateContainerOuterVethName(podName, podNamespace, containerID, containerIfaceName)
 
 	hostIface := &current.Interface{Name: hostIfaceName}
 	containerIface := &current.Interface{Name: containerIfaceName, Sandbox: containerNetNS}

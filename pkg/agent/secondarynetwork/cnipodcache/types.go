@@ -22,9 +22,18 @@ type CNIConfigInfo struct {
 	ContainerNetNS string
 	MTU            int
 	PodCNIDeleted  bool
-	// Uses interface name as a key and the network/CNI config (obtained from network-attachment-definition) as value.
+	// Interfaces is a map that stores the secondary interface information with interface
+	// name to be the key.
+	Interfaces map[string]*InterfaceInfo
+}
+
+type InterfaceInfo struct {
+	NetworkType       string
+	HostInterfaceName string
+	// OVS port UUID for a VLAN interface.
+	OVSPortUUID string
 	// NOTE: Interface specific network/CNI config required to be maintained for IPAM clean-up needs.
-	NetworkConfig map[string][]byte
+	CNIConfig []byte
 }
 
 type CNIPodInfoStore interface {

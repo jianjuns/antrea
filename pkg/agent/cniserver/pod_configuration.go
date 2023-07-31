@@ -84,9 +84,9 @@ func newPodConfigurator(
 	gatewayMAC net.HardwareAddr,
 	ovsDatapathType ovsconfig.OVSDatapathType,
 	isOvsHardwareOffloadEnabled bool,
+	disableTXChecksumOffload bool,
 	podUpdateNotifier channel.Notifier,
 	podInfoStore cnipodcache.CNIPodInfoStore,
-	disableTXChecksumOffload bool,
 ) (*podConfigurator, error) {
 	ifConfigurator, err := newInterfaceConfigurator(ovsDatapathType, isOvsHardwareOffloadEnabled, disableTXChecksumOffload)
 	if err != nil {

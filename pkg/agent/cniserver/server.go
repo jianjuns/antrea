@@ -387,10 +387,6 @@ func (s *CNIServer) validatePrevResult(cfgArgs *cnipb.CniCmdArgs, prevResult *cu
 	return nil
 }
 
-func (s *CNIServer) GetPodConfigurator() *podConfigurator {
-	return s.podConfigurator
-}
-
 // Declared variables for testing
 var (
 	ipamSecondaryNetworkAdd   = ipam.SecondaryNetworkAdd
@@ -668,9 +664,9 @@ func (s *CNIServer) Initialize(
 
 	s.podConfigurator, err = newPodConfigurator(
 		ovsBridgeClient, ofClient, s.routeClient, ifaceStore, s.nodeConfig.GatewayConfig.MAC,
-		ovsBridgeClient.GetOVSDatapathType(), ovsBridgeClient.IsHardwareOffloadEnabled(), podUpdateNotifier,
-		podInfoStore, s.disableTXChecksumOffload,
-	)
+		ovsBridgeClient.GetOVSDatapathType(), ovsBridgeClient.IsHardwareOffloadEnabled(),
+		s.disableTXChecksumOffload,
+		podUpdateNotifier, podInfoStore)
 	if err != nil {
 		return fmt.Errorf("error during initialize podConfigurator: %v", err)
 	}

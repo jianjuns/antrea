@@ -29,6 +29,7 @@ type IPAMConfig struct {
 
 const (
 	sriovNetworkType = "sriov"
+	vlanNetworkType  = "vlan"
 )
 
 type SecondaryNetworkConfig struct {
@@ -38,5 +39,6 @@ type SecondaryNetworkConfig struct {
 	Type string `json:"type,omitempty"`
 	// Set networkType to "sriov"
 	NetworkType string     `json:"networkType,omitempty"`
+	VLAN        uint16     `json:"vlan, omitempty"`
 	IPAM        IPAMConfig `json:"ipam,omitempty"`
 }
