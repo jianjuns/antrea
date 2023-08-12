@@ -177,3 +177,9 @@ func ResetIPAMDriver(ipamType string, driver IPAMDriver) {
 func AddIPAMResult(key string, result *IPAMResult) {
 	ipamResults.Store(key, result)
 }
+
+// GetSecondaryNetworkAllocator returns the Antrea IPAM driver as the
+// SecondaryNetworkIPAMAllocator implementation.
+func GetSecondaryNetworkAllocator() *AntreaIPAM {
+	return getAntreaIPAMDriver()
+}

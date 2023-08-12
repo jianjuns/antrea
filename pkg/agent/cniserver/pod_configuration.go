@@ -260,7 +260,7 @@ func (pc *podConfigurator) configureInterfaces(
 	// be dropped by OVS.
 	if err = pc.ifConfigurator.advertiseContainerAddr(containerNetNS, containerIface.Name, &result.Result); err != nil {
 		// Do not return an error and fail the interface creation.
-		klog.ErrorS(err, "Failed to advertise IP address for container", "container ID", containerID)
+		klog.ErrorS(err, "Failed to advertise IP address for container", "container", containerID)
 	}
 	// Mark the manipulation as success to cancel deferred operations.
 	success = true

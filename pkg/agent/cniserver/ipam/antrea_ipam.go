@@ -58,8 +58,8 @@ const (
 
 // Resource needs to be unique since it is used as identifier in Del.
 // Therefore Container ID is used, while Pod/Namespace are shown for visibility.
-func getAllocationOwner(args *invoke.Args, k8sArgs *types.K8sArgs, reservedOwner *crdv1a2.IPAddressOwner, secondary bool) crdv1a2.IPAddressOwner {
-	podOwner := &crdv1a2.PodOwner{
+func getAllocationPodOwner(args *invoke.Args, k8sArgs *types.K8sArgs, reservedOwner *crdv1a2.IPAddressOwner, secondary bool) *crdv1a2.PodOwner {
+	podOwner := crdv1a2.PodOwner{
 		Name:        string(k8sArgs.K8S_POD_NAME),
 		Namespace:   string(k8sArgs.K8S_POD_NAMESPACE),
 		ContainerID: args.ContainerID,
@@ -69,14 +69,17 @@ func getAllocationOwner(args *invoke.Args, k8sArgs *types.K8sArgs, reservedOwner
 		// the secondary network interface.
 		podOwner.IFName = args.IfName
 	}
+	return &podOwner
+}
+
+func getAllocationOwner(args *invoke.Args, k8sArgs *types.K8sArgs, reservedOwner *crdv1a2.IPAddressOwner, secondary bool) *crdv1a2.IPAddressOwner {
+	podOwner := getAllocationPodOwner(args, k8sArgs, nil, secondary)
 	if reservedOwner != nil {
 		owner := *reservedOwner
 		owner.Pod = podOwner
-		return owner
+		return &owner
 	}
-	return crdv1a2.IPAddressOwner{
-		Pod: podOwner,
-	}
+	return &crdv1a2.IPAddressOwner{Pod: podOwner}
 }
 
 // Helper to generate IP config and default route, taking IP version into account
@@ -143,7 +146,7 @@ func (d *AntreaIPAM) Add(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfi
 		return false, nil, nil
 	}
 
-	owner := getAllocationOwner(args, k8sArgs, reservedOwner, false)
+	owner := *getAllocationOwner(args, k8sArgs, reservedOwner, false)
 	var ip net.IP
 	var subnetInfo *crdv1a2.SubnetInfo
 	if reservedOwner != nil {
@@ -172,8 +175,8 @@ func (d *AntreaIPAM) Add(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfi
 
 // Del deletes IP associated with resource from IP Pool status
 func (d *AntreaIPAM) Del(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfig []byte) (bool, error) {
-	owner := getAllocationOwner(args, k8sArgs, nil, false)
-	foundAllocation, err := d.del(owner.Pod)
+	podOwner := getAllocationPodOwner(args, k8sArgs, nil, false)
+	foundAllocation, err := d.del(podOwner)
 	if err != nil {
 		// Let the invoker retry at error.
 		return true, err
@@ -183,7 +186,7 @@ func (d *AntreaIPAM) Del(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfi
 	return foundAllocation, nil
 }
 
-// Check verifues IP associated with resource is tracked in IP Pool status
+// Check verifues IP associated with resource is tracked in IP Pool status.
 func (d *AntreaIPAM) Check(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfig []byte) (bool, error) {
 	mine, allocator, _, _, err := d.owns(k8sArgs)
 	if err != nil {
@@ -205,7 +208,10 @@ func (d *AntreaIPAM) Check(args *invoke.Args, k8sArgs *types.K8sArgs, networkCon
 	return true, nil
 }
 
-func (d *AntreaIPAM) secondaryNetworkAdd(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfig *types.NetworkConfig) (*current.Result, error) {
+// SecondaryNetworkAllocate allocates IP addresses for a Pod secondary network interface, based on
+// the IPAM configuration of the passed CNI network configuration.
+// It supports IPAM for both Antrea managed secondary networks and Multus managed secondary network.
+func (d *AntreaIPAM) SecondaryNetworkAllocate(podOwner *crdv1a2.PodOwner, networkConfig *types.NetworkConfig) (*current.Result, error) {
 	ipamConf := networkConfig.IPAM
 	numPools := len(ipamConf.IPPools)
 
@@ -223,12 +229,11 @@ func (d *AntreaIPAM) secondaryNetworkAdd(args *invoke.Args, k8sArgs *types.K8sAr
 			return nil, err
 		}
 
-		owner := getAllocationOwner(args, k8sArgs, nil, true)
 		var allocatorsToRelease []*poolallocator.IPPoolAllocator
 		defer func() {
 			for _, allocator := range allocatorsToRelease {
 				// Try to release the allocated IPs after an error.
-				allocator.ReleaseContainer(owner.Pod.ContainerID, owner.Pod.IFName)
+				allocator.ReleaseContainer(podOwner.ContainerID, podOwner.IFName)
 			}
 		}()
 
@@ -240,6 +245,7 @@ func (d *AntreaIPAM) secondaryNetworkAdd(args *invoke.Args, k8sArgs *types.K8sAr
 
 			var ip net.IP
 			var subnetInfo *crdv1a2.SubnetInfo
+			owner := crdv1a2.IPAddressOwner{Pod: podOwner}
 			ip, subnetInfo, err = allocator.AllocateNext(crdv1a2.IPAddressPhaseAllocated, owner)
 			if err != nil {
 				return nil, err
@@ -272,9 +278,19 @@ func (d *AntreaIPAM) secondaryNetworkAdd(args *invoke.Args, k8sArgs *types.K8sAr
 	return result, nil
 }
 
+// SecondaryNetworkRelease releases IP addresses allocated for a Pod secondary network interface.
+func (d *AntreaIPAM) SecondaryNetworkRelease(owner *crdv1a2.PodOwner) error {
+	_, err := d.del(owner)
+	return err
+}
+
+func (d *AntreaIPAM) secondaryNetworkAdd(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfig *types.NetworkConfig) (*current.Result, error) {
+	return d.SecondaryNetworkAllocate(getAllocationPodOwner(args, k8sArgs, nil, true), networkConfig)
+}
+
 func (d *AntreaIPAM) secondaryNetworkDel(args *invoke.Args, k8sArgs *types.K8sArgs, networkConfig *types.NetworkConfig) error {
-	owner := getAllocationOwner(args, k8sArgs, nil, true)
-	_, err := d.del(owner.Pod)
+	podOwner := getAllocationPodOwner(args, k8sArgs, nil, true)
+	_, err := d.del(podOwner)
 	return err
 }
 
